@@ -22,7 +22,7 @@ moderator:
     # Plans with several blocks (e.g. "5 languages, each with code + a
     # description" -> 10 blocks) need considerably more headroom than 512
     # tokens, or the JSON gets truncated mid-string and fails to parse.
-    max_new_tokens: 1536
+    max_new_tokens: 2048
     temperature: 0.2
     do_sample: true
 
@@ -31,7 +31,7 @@ text:
   device: cuda
   dtype: float16
   generation_kwargs:
-    max_new_tokens: 512
+    max_new_tokens: 1024
     temperature: 0.7
     do_sample: true
 
@@ -45,12 +45,12 @@ code:
   device: cuda
   dtype: float16
   generation_kwargs:
-    max_new_tokens: 512
+    max_new_tokens: 2048
     temperature: 0.2
     do_sample: true
 
 structured:
-  model_id: Qwen/Qwen2.5-0.5B-Instruct
+  model_id: Qwen/Qwen2.5-1.5B-Instruct
   device: cuda
   dtype: float16
   generation_kwargs:
