@@ -52,3 +52,17 @@ structured:
     max_new_tokens: 256
     temperature: 0.1
     do_sample: true
+
+image:
+  # sd-turbo is a distilled, single-step Stable Diffusion model: fast and
+  # low-VRAM (fits comfortably in 4GB), at some quality cost vs. multi-step
+  # models. Swap for e.g. "stabilityai/stable-diffusion-xl-base-1.0" if you
+  # have more VRAM and want higher quality (and raise num_inference_steps/
+  # guidance_scale accordingly, since those are tuned for sd-turbo here).
+  model_id: stabilityai/sd-turbo
+  kind: diffusion
+  device: cuda
+  dtype: float16
+  generation_kwargs:
+    num_inference_steps: 1
+    guidance_scale: 0.0

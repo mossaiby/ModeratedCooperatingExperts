@@ -14,6 +14,9 @@ dependencies = [
     "click>=8.1",
     "pyyaml>=6.0",
     "networkx>=3.2",
+    "diffusers>=0.27",
+    "accelerate>=0.30",
+    "pillow>=10.0",
 ]
 
 [project.optional-dependencies]

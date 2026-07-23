@@ -71,6 +71,10 @@ class ModelConfig:
     device: str = "cpu"
     dtype: str = "auto"
     generation_kwargs: dict[str, Any] = field(default_factory=dict)
+    kind: str = "causal_lm"
+    """Either "causal_lm" (a chat-style transformers text model, the default)
+    or "diffusion" (a diffusers text-to-image pipeline, used for the "image"
+    role)."""
 
 
 @dataclass
@@ -95,6 +99,7 @@ def load_model_configs(config_path: str | Path) -> dict[str, ModelConfig]:
             device=cfg.get("device", "cpu"),
             dtype=cfg.get("dtype", "auto"),
             generation_kwargs=cfg.get("generation_kwargs", {}) or {},
+            kind=cfg.get("kind", "causal_lm"),
         )
     return configs
 
@@ -124,17 +129,34 @@ class ModelManager:
             raise KeyError(f"no model configured for role '{role}'")
         cfg = self._configs[role]
 
+        if cfg.kind == "diffusion":
+            return self._load_diffusion(cfg)
+        return self._load_causal_lm(cfg)
+
+    def _load_causal_lm(self, cfg: ModelConfig) -> LoadedModel:
         # Imported lazily so importing moce doesn't require torch/transformers
         # unless a real model is actually loaded (keeps unit tests fast/mockable).
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
-        logger.info("Loading model for role '%s': %s", role, cfg.model_id)
+        logger.info("Loading causal LM for role: %s", cfg.model_id)
         tokenizer = AutoTokenizer.from_pretrained(cfg.model_id)
         dtype = None if cfg.dtype == "auto" else getattr(torch, cfg.dtype)
         model = AutoModelForCausalLM.from_pretrained(cfg.model_id, dtype=dtype)
         model.to(cfg.device)
         return LoadedModel(model=model, tokenizer=tokenizer)
+
+    def _load_diffusion(self, cfg: ModelConfig) -> LoadedModel:
+        # Imported lazily for the same reason as above; diffusers is only
+        # required if an "image" (or other diffusion-kind) role is used.
+        import torch
+        from diffusers import AutoPipelineForText2Image
+
+        logger.info("Loading text-to-image pipeline: %s", cfg.model_id)
+        dtype = None if cfg.dtype == "auto" else getattr(torch, cfg.dtype)
+        pipe = AutoPipelineForText2Image.from_pretrained(cfg.model_id, torch_dtype=dtype)
+        pipe.to(cfg.device)
+        return LoadedModel(model=pipe, tokenizer=None)
 
     def get(self, role: str) -> LoadedModel:
         if role in self._cache:
@@ -177,3 +199,26 @@ class ModelManager:
         input_length = inputs["input_ids"].shape[-1]
         new_tokens = output_ids[0][input_length:]
         return loaded.tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+
+    def generate_image(
+        self,
+        role: str,
+        prompt: str,
+        output_path: str | Path,
+        **generation_kwargs: Any,
+    ) -> str:
+        """Generate an image for `prompt` using the diffusion pipeline
+        configured for `role`, saving it to `output_path` and returning the
+        path (as a string)."""
+        loaded = self.get(role)
+        cfg = self._configs[role]
+        merged_kwargs = {**cfg.generation_kwargs, **generation_kwargs}
+
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        result = loaded.model(prompt, **merged_kwargs)
+        image = result.images[0]
+        image.save(output_path)
+        return str(output_path)
+

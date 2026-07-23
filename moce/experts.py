@@ -6,7 +6,9 @@ from __future__ import annotations
 import ast
 import json
 import logging
+import os
 import re
+from pathlib import Path
 from typing import Protocol
 
 from moce.schema import Block, BlockResult
@@ -14,6 +16,11 @@ from moce.schema import Block, BlockResult
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_RETRIES = 3
+
+# Directory where generated images are saved; the assembled document embeds
+# a Markdown reference to the file at this path. Overridable via the
+# MOCE_IMAGE_OUTPUT_DIR environment variable.
+IMAGE_OUTPUT_DIR = Path(os.environ.get("MOCE_IMAGE_OUTPUT_DIR", "moce_output/images"))
 
 _BOILERPLATE_PREFIXES = re.compile(
     r"^(?:(?:sure|okay|ok|certainly|here('|’)s|here is|of course|the answer is|the answer)"
@@ -55,9 +62,8 @@ class Generator(Protocol):
     def generate(self, role: str, system_prompt: str, user_prompt: str, **kw) -> str:
         ...
 
-
-class ImageNotImplementedError(NotImplementedError):
-    """Image block generation is stubbed out in v1."""
+    def generate_image(self, role: str, prompt: str, output_path: str, **kw) -> str:
+        ...
 
 
 def _substitute_dependencies(prompt: str, context: dict[str, BlockResult]) -> str:
@@ -105,6 +111,34 @@ def _validate_structured(text: str) -> str:
     return json.dumps(data)
 
 
+def _run_image_block(generator: Generator, block: Block, context: dict[str, BlockResult]) -> BlockResult:
+    """Generate an image for `block` via the generator's `generate_image`,
+    returning a Markdown image reference to the saved file as the block's
+    validated output."""
+    prompt = _substitute_dependencies(block.prompt, context)
+    if block.constraints:
+        prompt = f"{prompt}\nAdditional constraints: {block.constraints}"
+
+    output_path = IMAGE_OUTPUT_DIR / f"{block.id}.png"
+    try:
+        saved_path = generator.generate_image(role="image", prompt=prompt, output_path=str(output_path))
+    except Exception as exc:  # noqa: BLE001 - surface any generation failure as an invalid block
+        logger.warning("Image block '%s' failed to generate: %s", block.id, exc)
+        return BlockResult(
+            block_id=block.id,
+            status="invalid",
+            error_message=f"image generation failed: {exc}",
+        )
+
+    alt_text = block.constraints or block.id
+    return BlockResult(
+        block_id=block.id,
+        raw_output=saved_path,
+        validated_output=f"![{alt_text}]({saved_path})",
+        status="ok",
+    )
+
+
 def run_block(
     generator: Generator,
     block: Block,
@@ -115,11 +149,7 @@ def run_block(
     prompt, validating the result, and retrying on validation failure up to
     `max_retries` times before marking the block invalid."""
     if block.type == "image":
-        return BlockResult(
-            block_id=block.id,
-            status="invalid",
-            error_message="image block generation is not implemented in v1",
-        )
+        return _run_image_block(generator, block, context)
 
     system_prompt = _SYSTEM_PROMPTS[block.type]
     if block.constraints:

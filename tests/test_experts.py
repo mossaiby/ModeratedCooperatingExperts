@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from moce.experts import run_block
 from moce.schema import Block, BlockResult
@@ -8,13 +9,21 @@ class ScriptedGenerator:
     """Test double that returns a scripted sequence of responses for `generate`,
     ignoring which role/prompt was passed."""
 
-    def __init__(self, responses):
+    def __init__(self, responses, image_error=None):
         self._responses = list(responses)
         self.calls = []
+        self.image_calls = []
+        self._image_error = image_error
 
     def generate(self, role, system_prompt, user_prompt, **kw):
         self.calls.append((role, system_prompt, user_prompt))
         return self._responses.pop(0)
+
+    def generate_image(self, role, prompt, output_path, **kw):
+        self.image_calls.append((role, prompt, output_path))
+        if self._image_error is not None:
+            raise self._image_error
+        return output_path
 
 
 def make_block(**overrides):
@@ -66,12 +75,22 @@ def test_structured_block_fails_after_max_retries():
     assert result.retries == 2
 
 
-def test_image_block_is_stubbed():
+def test_image_block_generates_and_returns_markdown_reference():
     gen = ScriptedGenerator([])
+    block = make_block(type="image", prompt="a red fox")
+    result = run_block(gen, block, {})
+    expected_path = str(Path("moce_output/images/b1.png"))
+    assert result.status == "ok"
+    assert result.validated_output == f"![b1]({expected_path})"
+    assert gen.image_calls[0][1] == "a red fox"
+
+
+def test_image_block_reports_generation_failure():
+    gen = ScriptedGenerator([], image_error=RuntimeError("out of memory"))
     block = make_block(type="image")
     result = run_block(gen, block, {})
     assert result.status == "invalid"
-    assert "not implemented" in result.error_message
+    assert "out of memory" in result.error_message
 
 
 def test_dependency_substitution():
