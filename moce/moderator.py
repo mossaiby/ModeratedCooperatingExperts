@@ -37,8 +37,15 @@ multiple pieces of code (e.g. several languages, several functions) each \
 with its own description, create one "code" block and one dependent "text" \
 block PER item, not a single combined block for all of them.
 
+The top-level response MUST be a single JSON *object* with exactly two \
+keys, "blocks" and "assembly_template" — NEVER a bare JSON array/list of \
+blocks.
+
 Respond with ONLY a single JSON object matching this schema, with no \
-markdown fences, no commentary, and no extra text before or after the JSON:
+markdown fences, no commentary, and no extra text before or after the JSON. \
+Your ENTIRE response must be NOTHING OTHER THAN that JSON object — no \
+preamble, no explanation of your reasoning, no summary, and no trailing \
+remarks of any kind, before or after it:
 
 {PLAN_JSON_SCHEMA_HINT}
 
@@ -142,12 +149,31 @@ def _parse_json_object(cleaned: str) -> dict:
     after the first complete object (some models emit extra text/a repeated
     object after the closing brace, which otherwise fails as "Extra data")."""
     try:
-        return json.loads(cleaned)
+        parsed = json.loads(cleaned)
     except json.JSONDecodeError as exc:
         if exc.msg.startswith("Extra data"):
-            obj, _ = json.JSONDecoder().raw_decode(cleaned)
-            return obj
-        raise
+            parsed, _ = json.JSONDecoder().raw_decode(cleaned)
+        else:
+            raise
+    return _normalize_top_level_shape(parsed)
+
+
+def _normalize_top_level_shape(parsed) -> dict:
+    """Some models emit a bare JSON array of blocks instead of the required
+    {"blocks": [...], "assembly_template": "..."} object. Detect this and
+    wrap it, synthesizing an assembly_template that concatenates every
+    block's output_slot placeholder in order."""
+    if isinstance(parsed, dict):
+        return parsed
+    if isinstance(parsed, list):
+        output_slots = [
+            block["output_slot"]
+            for block in parsed
+            if isinstance(block, dict) and isinstance(block.get("output_slot"), str)
+        ]
+        assembly_template = "\n\n".join(f"{{{{{slot}}}}}" for slot in output_slots)
+        return {"blocks": parsed, "assembly_template": assembly_template}
+    raise json.JSONDecodeError("moderator output is not a JSON object or array", str(parsed), 0)
 
 
 def generate_plan(

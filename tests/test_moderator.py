@@ -82,3 +82,19 @@ def test_generate_plan_tolerates_trailing_extra_data():
     gen = ScriptedGenerator([VALID_PLAN_JSON + "\n{\"blocks\": [}"])
     plan = generate_plan(gen, "do something")
     assert plan.blocks[0].id == "b1"
+
+
+def test_generate_plan_wraps_bare_block_array():
+    """Some models emit a bare JSON array of blocks instead of the required
+    {"blocks": [...], "assembly_template": "..."} object."""
+    bare_array_json = """
+    [
+      {"id": "code1", "type": "code", "depends_on": [], "prompt": "write code", "output_slot": "code_slot"},
+      {"id": "text1", "type": "text", "depends_on": ["code1"], "prompt": "explain {{code1.output}}", "output_slot": "text_slot"}
+    ]
+    """
+    gen = ScriptedGenerator([bare_array_json])
+    plan = generate_plan(gen, "do something")
+    assert [b.id for b in plan.blocks] == ["code1", "text1"]
+    assert "{{code_slot}}" in plan.assembly_template
+    assert "{{text_slot}}" in plan.assembly_template
