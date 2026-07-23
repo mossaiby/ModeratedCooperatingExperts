@@ -27,7 +27,7 @@ moderator:
     do_sample: true
 
 text:
-  model_id: Qwen/Qwen2.5-0.5B-Instruct
+  model_id: Qwen/Qwen2.5-1.5B-Instruct
   device: cuda
   dtype: float16
   generation_kwargs:
