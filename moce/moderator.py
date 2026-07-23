@@ -137,6 +137,19 @@ def _normalize_depends_on(data: dict) -> dict:
     return data
 
 
+def _parse_json_object(cleaned: str) -> dict:
+    """Parse `cleaned` as a single JSON object, tolerating trailing garbage
+    after the first complete object (some models emit extra text/a repeated
+    object after the closing brace, which otherwise fails as "Extra data")."""
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        if exc.msg.startswith("Extra data"):
+            obj, _ = json.JSONDecoder().raw_decode(cleaned)
+            return obj
+        raise
+
+
 def generate_plan(
     generator: Generator,
     user_request: str,
@@ -153,10 +166,11 @@ def generate_plan(
             system_prompt=MODERATOR_SYSTEM_PROMPT,
             user_prompt=user_prompt,
         )
+        logger.debug("Moderator raw output (attempt %d/%d):\n%s", attempt, max_retries, raw)
         cleaned = _strip_code_fences(raw)
 
         try:
-            data = json.loads(cleaned)
+            data = _parse_json_object(cleaned)
             data = _normalize_block_types(data)
             data = _normalize_depends_on(data)
             plan = Plan.model_validate(data)

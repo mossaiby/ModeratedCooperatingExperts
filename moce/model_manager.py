@@ -31,11 +31,16 @@ DEFAULT_MAX_LOADED_MODELS = 2
 _NOISY_LOGGERS = ("transformers", "huggingface_hub", "urllib3", "filelock")
 
 
-def configure_model_logging(verbose: bool) -> None:
+def configure_model_logging(verbose: bool, debug: bool = False) -> None:
     """Silence (or re-enable) noisy transformers/huggingface_hub logging and
     progress bars. Call this once, before any model is loaded, based on the
-    CLI's --verbose flag."""
-    if verbose:
+    CLI's --verbose/--debug flags."""
+    if debug:
+        os.environ.pop("TRANSFORMERS_VERBOSITY", None)
+        os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
+        for name in _NOISY_LOGGERS:
+            logging.getLogger(name).setLevel(logging.DEBUG)
+    elif verbose:
         os.environ.pop("TRANSFORMERS_VERBOSITY", None)
         os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
         for name in _NOISY_LOGGERS:
@@ -50,7 +55,12 @@ def configure_model_logging(verbose: bool) -> None:
     try:
         import transformers
 
-        transformers.logging.set_verbosity_info() if verbose else transformers.logging.set_verbosity_error()
+        if debug:
+            transformers.logging.set_verbosity_debug()
+        elif verbose:
+            transformers.logging.set_verbosity_info()
+        else:
+            transformers.logging.set_verbosity_error()
     except ImportError:
         pass  # transformers not installed yet / not needed for this call site
 

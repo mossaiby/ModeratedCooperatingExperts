@@ -74,3 +74,11 @@ def test_generate_plan_raises_after_max_retries():
     gen = ScriptedGenerator(["nope", "still nope"])
     with pytest.raises(ModeratorError):
         generate_plan(gen, "do something", max_retries=2)
+
+
+def test_generate_plan_tolerates_trailing_extra_data():
+    """Some models emit valid JSON followed by trailing garbage (e.g. a
+    repeated/partial object), which otherwise fails as "Extra data"."""
+    gen = ScriptedGenerator([VALID_PLAN_JSON + "\n{\"blocks\": [}"])
+    plan = generate_plan(gen, "do something")
+    assert plan.blocks[0].id == "b1"

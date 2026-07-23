@@ -134,6 +134,9 @@ def run_block(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
         )
+        logger.debug(
+            "Block '%s' raw output (attempt %d/%d):\n%s", block.id, attempt, max_retries, raw
+        )
         try:
             if block.type == "code":
                 validated = _validate_code(raw)

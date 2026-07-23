@@ -18,16 +18,24 @@ DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "mode
 
 @click.group()
 @click.option("--verbose", is_flag=True, help="Enable verbose logging and intermediate output.")
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable debug diagnostics: raw model outputs, DEBUG-level logging, and "
+    "un-silenced transformers/huggingface_hub logging. Implies --verbose.",
+)
 @click.pass_context
-def main(ctx: click.Context, verbose: bool) -> None:
+def main(ctx: click.Context, verbose: bool, debug: bool) -> None:
     """Moderated Cooperating Experts CLI."""
     ctx.ensure_object(dict)
+    verbose = verbose or debug
     ctx.obj["verbose"] = verbose
+    ctx.obj["debug"] = debug
     logging.basicConfig(
-        level=logging.INFO if verbose else logging.WARNING,
+        level=logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING),
         format="%(levelname)s %(name)s: %(message)s",
     )
-    configure_model_logging(verbose)
+    configure_model_logging(verbose=verbose, debug=debug)
 
 
 @main.command()
@@ -63,6 +71,13 @@ def main(ctx: click.Context, verbose: bool) -> None:
     is_flag=True,
     help="Also print the moderator's plan, without the rest of --verbose's output.",
 )
+@click.option(
+    "--debug",
+    "debug_flag",
+    is_flag=True,
+    help="Enable debug diagnostics: raw model outputs, DEBUG-level logging, and "
+    "un-silenced transformers/huggingface_hub logging. Implies --verbose.",
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -72,12 +87,13 @@ def run(
     max_workers: int,
     verbose_flag: bool,
     show_plan: bool,
+    debug_flag: bool,
 ) -> None:
     """Run the full moderator -> experts -> assembler pipeline for USER_PROMPT."""
-    verbose = ctx.obj.get("verbose", False) or verbose_flag
-    if verbose:
-        logging.getLogger().setLevel(logging.INFO)
-    configure_model_logging(verbose)
+    debug = ctx.obj.get("debug", False) or debug_flag
+    verbose = ctx.obj.get("verbose", False) or verbose_flag or debug
+    logging.getLogger().setLevel(logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING))
+    configure_model_logging(verbose=verbose, debug=debug)
     manager = ModelManager.from_yaml(config_path)
 
     try:
@@ -100,6 +116,9 @@ def run(
         for block_id, result in results.items():
             click.echo(f"--- {block_id} ({result.status}) ---")
             click.echo(result.validated_output or result.error_message or "")
+            if debug and result.raw_output:
+                click.echo(f"[raw output, {result.retries} retries]")
+                click.echo(result.raw_output)
 
     click.echo("\n=== Final Document ===")
     click.echo(assemble(plan, results))
