@@ -31,20 +31,22 @@ DEFAULT_MAX_LOADED_MODELS = 2
 _NOISY_LOGGERS = ("transformers", "huggingface_hub", "urllib3", "filelock")
 
 
-def configure_model_logging(verbose: bool, debug: bool = False) -> None:
+def configure_model_logging(verbose: bool, debug: bool = False, show_model_noise: bool = False) -> None:
     """Silence (or re-enable) noisy transformers/huggingface_hub logging and
     progress bars. Call this once, before any model is loaded, based on the
-    CLI's --verbose/--debug flags."""
-    if debug:
+    CLI's --verbose/--debug/--show-model-noise flags.
+
+    Third-party model-loading noise (transformers/huggingface_hub/urllib3/
+    filelock logs, HF Hub progress bars) is suppressed by default even when
+    --debug is set, since --debug is meant for diagnosing *this project's*
+    logic (raw model outputs, retries, etc.), not model loading internals.
+    Pass show_model_noise=True to also surface that third-party noise."""
+    if show_model_noise:
         os.environ.pop("TRANSFORMERS_VERBOSITY", None)
         os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
+        level = logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING)
         for name in _NOISY_LOGGERS:
-            logging.getLogger(name).setLevel(logging.DEBUG)
-    elif verbose:
-        os.environ.pop("TRANSFORMERS_VERBOSITY", None)
-        os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
-        for name in _NOISY_LOGGERS:
-            logging.getLogger(name).setLevel(logging.INFO)
+            logging.getLogger(name).setLevel(level)
     else:
         os.environ["TRANSFORMERS_VERBOSITY"] = "error"
         os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
@@ -55,10 +57,8 @@ def configure_model_logging(verbose: bool, debug: bool = False) -> None:
     try:
         import transformers
 
-        if debug:
-            transformers.logging.set_verbosity_debug()
-        elif verbose:
-            transformers.logging.set_verbosity_info()
+        if show_model_noise:
+            transformers.logging.set_verbosity_debug() if debug else transformers.logging.set_verbosity_info()
         else:
             transformers.logging.set_verbosity_error()
     except ImportError:

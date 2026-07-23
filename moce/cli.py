@@ -21,21 +21,30 @@ DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "mode
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable debug diagnostics: raw model outputs, DEBUG-level logging, and "
-    "un-silenced transformers/huggingface_hub logging. Implies --verbose.",
+    help="Enable debug diagnostics for THIS PROJECT's logic: raw model outputs, "
+    "retries, and DEBUG-level logging. Implies --verbose. Third-party model "
+    "loading noise stays suppressed unless --show-model-noise is also passed.",
+)
+@click.option(
+    "--show-model-noise",
+    is_flag=True,
+    help="Also surface transformers/huggingface_hub model-loading logs and "
+    "progress bars, normally suppressed since they rarely help when "
+    "debugging this project's own logic.",
 )
 @click.pass_context
-def main(ctx: click.Context, verbose: bool, debug: bool) -> None:
+def main(ctx: click.Context, verbose: bool, debug: bool, show_model_noise: bool) -> None:
     """Moderated Cooperating Experts CLI."""
     ctx.ensure_object(dict)
     verbose = verbose or debug
     ctx.obj["verbose"] = verbose
     ctx.obj["debug"] = debug
+    ctx.obj["show_model_noise"] = show_model_noise
     logging.basicConfig(
         level=logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING),
         format="%(levelname)s %(name)s: %(message)s",
     )
-    configure_model_logging(verbose=verbose, debug=debug)
+    configure_model_logging(verbose=verbose, debug=debug, show_model_noise=show_model_noise)
 
 
 @main.command()
@@ -75,8 +84,17 @@ def main(ctx: click.Context, verbose: bool, debug: bool) -> None:
     "--debug",
     "debug_flag",
     is_flag=True,
-    help="Enable debug diagnostics: raw model outputs, DEBUG-level logging, and "
-    "un-silenced transformers/huggingface_hub logging. Implies --verbose.",
+    help="Enable debug diagnostics for THIS PROJECT's logic: raw model outputs, "
+    "retries, and DEBUG-level logging. Implies --verbose. Third-party model "
+    "loading noise stays suppressed unless --show-model-noise is also passed.",
+)
+@click.option(
+    "--show-model-noise",
+    "show_model_noise_flag",
+    is_flag=True,
+    help="Also surface transformers/huggingface_hub model-loading logs and "
+    "progress bars, normally suppressed since they rarely help when "
+    "debugging this project's own logic.",
 )
 @click.pass_context
 def run(
@@ -88,12 +106,14 @@ def run(
     verbose_flag: bool,
     show_plan: bool,
     debug_flag: bool,
+    show_model_noise_flag: bool,
 ) -> None:
     """Run the full moderator -> experts -> assembler pipeline for USER_PROMPT."""
     debug = ctx.obj.get("debug", False) or debug_flag
     verbose = ctx.obj.get("verbose", False) or verbose_flag or debug
+    show_model_noise = ctx.obj.get("show_model_noise", False) or show_model_noise_flag
     logging.getLogger().setLevel(logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING))
-    configure_model_logging(verbose=verbose, debug=debug)
+    configure_model_logging(verbose=verbose, debug=debug, show_model_noise=show_model_noise)
     manager = ModelManager.from_yaml(config_path)
 
     try:
