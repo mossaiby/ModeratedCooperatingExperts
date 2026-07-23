@@ -98,3 +98,24 @@ def test_generate_plan_wraps_bare_block_array():
     assert [b.id for b in plan.blocks] == ["code1", "text1"]
     assert "{{code_slot}}" in plan.assembly_template
     assert "{{text_slot}}" in plan.assembly_template
+
+
+def test_generate_plan_injects_missing_dependency_reference():
+    """Regression: a block correctly lists a dependency in `depends_on`, but
+    the moderator forgot to include the {{block_id.output}} placeholder in
+    the prompt text itself. The Plan's prompt text must be corrected to
+    include the reference, not just left as-is (the printed plan should
+    show the relationship, and the expert should have something to act on)."""
+    plan_json = """
+    {
+      "blocks": [
+        {"id": "code1", "type": "code", "depends_on": [], "prompt": "write code", "output_slot": "code_slot"},
+        {"id": "text1", "type": "text", "depends_on": ["code1"], "prompt": "Explain what this code does.", "output_slot": "text_slot"}
+      ],
+      "assembly_template": "{{code_slot}}\\n\\n{{text_slot}}"
+    }
+    """
+    gen = ScriptedGenerator([plan_json])
+    plan = generate_plan(gen, "do something")
+    text_block = plan.block_map()["text1"]
+    assert "{{code1.output}}" in text_block.prompt

@@ -164,6 +164,40 @@ def _normalize_depends_on(data: dict) -> dict:
     return data
 
 
+def _ensure_dependency_references(data: dict) -> dict:
+    """Guarantee that every declared `depends_on` relationship is actually
+    reflected in the block's `prompt` text as a `{{block_id.output}}`
+    placeholder. Small models frequently set `depends_on` correctly (so the
+    DAG/scheduling is right) but never mention the dependency in the prompt
+    itself, leaving the expert with nothing to act on (e.g. "explain this
+    code" with no code ever attached) and leaving the *plan itself* with no
+    visible trace of the relationship (confusing when inspected via
+    --show-plan/--verbose). Rather than relying solely on runtime injection
+    in experts.py, fix the plan data itself here: for every dependency id
+    missing its placeholder, append `{{{{dep_id.output}}}}` to the prompt.
+    """
+    blocks = data.get("blocks")
+    if not isinstance(blocks, list):
+        return data
+
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        depends_on = block.get("depends_on")
+        prompt = block.get("prompt")
+        if not isinstance(depends_on, list) or not isinstance(prompt, str):
+            continue
+
+        missing = [
+            dep for dep in depends_on
+            if isinstance(dep, str) and f"{{{{{dep}.output}}}}" not in prompt
+        ]
+        if missing:
+            references = " ".join(f"{{{{{dep}.output}}}}" for dep in missing)
+            block["prompt"] = f"{prompt.rstrip()}\n\n{references}"
+    return data
+
+
 def _parse_json_object(cleaned: str) -> dict:
     """Parse `cleaned` as a single JSON object, tolerating trailing garbage
     after the first complete object (some models emit extra text/a repeated
@@ -219,6 +253,7 @@ def generate_plan(
             data = _parse_json_object(cleaned)
             data = _normalize_block_types(data)
             data = _normalize_depends_on(data)
+            data = _ensure_dependency_references(data)
             plan = Plan.model_validate(data)
             validate_dag(plan)
             return plan
