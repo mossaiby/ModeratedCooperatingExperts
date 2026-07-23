@@ -29,6 +29,9 @@ DEFAULT_MAX_LOADED_MODELS = 2
 # progress bars, tokenizer-parallelism fork warnings) but rarely useful
 # unless actively debugging model loading itself. Includes diffusers/
 # accelerate/safetensors since the "image" role uses a diffusers pipeline.
+# httpcore/httpx/requests are the HTTP stacks huggingface_hub uses under
+# the hood for repo/model file requests (e.g. HEAD requests to check for
+# updates) and log per-request connection lifecycle events at DEBUG.
 _NOISY_LOGGERS = (
     "transformers",
     "huggingface_hub",
@@ -37,6 +40,9 @@ _NOISY_LOGGERS = (
     "safetensors",
     "urllib3",
     "filelock",
+    "httpcore",
+    "httpx",
+    "requests",
 )
 
 
