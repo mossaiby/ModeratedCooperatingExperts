@@ -27,4 +27,9 @@ def assemble(plan: Plan, results: dict[str, BlockResult]) -> str:
         slot = match.group(1)
         return slot_to_content.get(slot, match.group(0))
 
-    return re.sub(r"\{\{(\w[\w-]*)\}\}", replace, plan.assembly_template)
+    # Tolerate a moderator model mistakenly appending a dotted suffix (e.g.
+    # "{{slot.output}}" or "{{slot.output_slot}}"), confusing this template's
+    # "{{output_slot}}" syntax with the block-dependency "{{block_id.output}}"
+    # syntax used inside block prompts. Only the leading identifier is used
+    # to look up the slot's content; any dotted suffix is ignored.
+    return re.sub(r"\{\{(\w[\w-]*)(?:\.\w[\w-]*)?\}\}", replace, plan.assembly_template)

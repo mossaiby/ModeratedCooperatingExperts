@@ -10,7 +10,7 @@ from typing import Protocol
 from pydantic import ValidationError
 
 from moce.dag import DagError, validate_dag
-from moce.schema import PLAN_JSON_SCHEMA_HINT, Plan
+from moce.schema import PLAN_EXAMPLE, PLAN_JSON_SCHEMA_HINT, Plan
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,8 @@ Respond with ONLY a single JSON object matching this schema, with no \
 markdown fences, no commentary, and no extra text before or after the JSON:
 
 {PLAN_JSON_SCHEMA_HINT}
+
+{PLAN_EXAMPLE}
 """
 
 

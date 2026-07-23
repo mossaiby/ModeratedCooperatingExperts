@@ -56,3 +56,18 @@ def test_assemble_fills_template_and_reports_errors():
     doc = assemble(plan, results)
     assert "A:hello" in doc
     assert "ERROR" in doc and "bad output" in doc
+
+
+def test_assemble_tolerates_dotted_slot_suffix():
+    """Small moderator models sometimes confuse the assembly_template's bare
+    "{{slot}}" syntax with the block-dependency "{{block_id.output}}" syntax
+    and emit "{{slot.output}}"/"{{slot.output_slot}}" instead. The assembler
+    should still fill these in using the leading identifier."""
+    plan = Plan(
+        blocks=[Block(id="b1", type="text", prompt="p", output_slot="slot1")],
+        assembly_template="A:{{slot1.output}} B:{{slot1.output_slot}}",
+    )
+    results = {"b1": BlockResult(block_id="b1", validated_output="hello", status="ok")}
+    doc = assemble(plan, results)
+    assert doc == "A:hello B:hello"
+

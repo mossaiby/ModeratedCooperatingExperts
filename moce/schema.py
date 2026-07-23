@@ -32,6 +32,42 @@ PLAN_JSON_SCHEMA_HINT = """
 }
 """.strip()
 
+# A concrete worked example, shown to the moderator model as a few-shot
+# demonstration. Small local models otherwise frequently confuse the two
+# distinct placeholder syntaxes (assembly_template's bare "{{output_slot}}"
+# vs. a block prompt's dependency reference "{{block_id.output}}"), and
+# often skip setting depends_on/substitution even when one block's content
+# logically depends on another's.
+PLAN_EXAMPLE = """
+Example — request: "Write a function to reverse a string and explain it."
+
+{
+  "blocks": [
+    {
+      "id": "code1",
+      "type": "code",
+      "depends_on": [],
+      "prompt": "Write a complete, working function that reverses a string.",
+      "output_slot": "code_block",
+      "constraints": null
+    },
+    {
+      "id": "text1",
+      "type": "text",
+      "depends_on": ["code1"],
+      "prompt": "Explain in plain English what this code does: {{code1.output}}",
+      "output_slot": "explanation_block",
+      "constraints": null
+    }
+  ],
+  "assembly_template": "{{code_block}}\\n\\n{{explanation_block}}"
+}
+
+Notice: the block "prompt" field uses "{{block_id.output}}" to reference
+another block's output; the top-level "assembly_template" field uses only
+the bare "{{output_slot}}" (never with a ".output" or any other suffix).
+""".strip()
+
 
 class Block(BaseModel):
     id: str = Field(min_length=1)
