@@ -23,6 +23,14 @@ structured, or image), a prompt for the specialist expert who will fill it, \
 and may depend on other blocks (e.g. a text block explaining code may depend \
 on the code block).
 
+If the request asks for code, create a separate "code" block whose prompt \
+asks the expert to write the actual, complete, working code (not a "text" \
+block describing code). If the request asks for an explanation of that \
+code, create a separate "text" block that depends on the code block and \
+explains the *actual* code via {{{{block_id.output}}}}, rather than \
+describing hypothetically what code "could" do. Never substitute a "text" \
+block for what should be a "code" or "structured" block.
+
 Respond with ONLY a single JSON object matching this schema, with no \
 markdown fences, no commentary, and no extra text before or after the JSON:
 

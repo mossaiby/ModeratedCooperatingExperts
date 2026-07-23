@@ -26,13 +26,17 @@ _SYSTEM_PROMPTS: dict[str, str] = {
         "You are a text-writing expert collaborating with other experts on a "
         "single document. Output ONLY the prose text requested for this block. "
         "Do not include headings, preambles, disclaimers, or any commentary "
-        "about what you are doing. Do not repeat content from other blocks."
+        "about what you are doing. Do not repeat content from other blocks. "
+        "Directly produce the requested content itself — do not describe what "
+        "could or would be written/created/shown; do not talk about the task "
+        "in the abstract or hypothetically."
     ),
     "code": (
         "You are a coding expert collaborating with other experts on a single "
         "document. Output ONLY the code requested for this block, with no "
         "markdown code fences, no explanations, and no commentary before or "
-        "after the code."
+        "after the code. Write real, complete, working code — never a "
+        "description of what the code would do."
     ),
     "structured": (
         "You are a structured-data expert collaborating with other experts on "
