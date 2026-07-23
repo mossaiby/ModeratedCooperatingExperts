@@ -9,7 +9,7 @@ from pathlib import Path
 import click
 
 from moce.assembler import assemble
-from moce.model_manager import ModelManager
+from moce.model_manager import ModelManager, configure_model_logging
 from moce.moderator import ModeratorError, generate_plan
 from moce.orchestrator import run_plan
 
@@ -27,6 +27,7 @@ def main(ctx: click.Context, verbose: bool) -> None:
         level=logging.INFO if verbose else logging.WARNING,
         format="%(levelname)s %(name)s: %(message)s",
     )
+    configure_model_logging(verbose)
 
 
 @main.command()
@@ -57,6 +58,11 @@ def main(ctx: click.Context, verbose: bool) -> None:
     is_flag=True,
     help="Also print the moderator's plan and each block's output.",
 )
+@click.option(
+    "--show-plan",
+    is_flag=True,
+    help="Also print the moderator's plan, without the rest of --verbose's output.",
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -65,11 +71,13 @@ def run(
     dry_run: bool,
     max_workers: int,
     verbose_flag: bool,
+    show_plan: bool,
 ) -> None:
     """Run the full moderator -> experts -> assembler pipeline for USER_PROMPT."""
     verbose = ctx.obj.get("verbose", False) or verbose_flag
     if verbose:
         logging.getLogger().setLevel(logging.INFO)
+    configure_model_logging(verbose)
     manager = ModelManager.from_yaml(config_path)
 
     try:
@@ -78,7 +86,7 @@ def run(
         click.echo(f"Moderator failed: {exc}", err=True)
         sys.exit(1)
 
-    if verbose or dry_run:
+    if verbose or dry_run or show_plan:
         click.echo("=== Plan ===")
         click.echo(json.dumps(plan.model_dump(), indent=2))
 

@@ -12,6 +12,7 @@ the limit is exceeded.
 from __future__ import annotations
 
 import logging
+import os
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,6 +23,36 @@ import yaml
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_LOADED_MODELS = 2
+
+# Third-party loggers/env vars that are extremely chatty during model
+# download/load (HF Hub repo card fetches, tokenizer/config info logs,
+# progress bars, tokenizer-parallelism fork warnings) but rarely useful
+# unless actively debugging model loading itself.
+_NOISY_LOGGERS = ("transformers", "huggingface_hub", "urllib3", "filelock")
+
+
+def configure_model_logging(verbose: bool) -> None:
+    """Silence (or re-enable) noisy transformers/huggingface_hub logging and
+    progress bars. Call this once, before any model is loaded, based on the
+    CLI's --verbose flag."""
+    if verbose:
+        os.environ.pop("TRANSFORMERS_VERBOSITY", None)
+        os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
+        for name in _NOISY_LOGGERS:
+            logging.getLogger(name).setLevel(logging.INFO)
+    else:
+        os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+        os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+        for name in _NOISY_LOGGERS:
+            logging.getLogger(name).setLevel(logging.ERROR)
+
+    try:
+        import transformers
+
+        transformers.logging.set_verbosity_info() if verbose else transformers.logging.set_verbosity_error()
+    except ImportError:
+        pass  # transformers not installed yet / not needed for this call site
 
 
 @dataclass
