@@ -50,6 +50,37 @@ def test_code_block_strips_fences():
     assert result.validated_output == "print('hi')"
 
 
+def test_code_block_discards_trailing_prose_after_stray_fence():
+    """Regression: small models sometimes emit raw code (no opening fence),
+    then a single stray closing "```", then a prose explanation paragraph —
+    the explanation must not leak into the code block's output."""
+    raw = (
+        "#include <iostream>\n"
+        "int main() { std::cout << \"hi\"; return 0; }\n"
+        "```\n"
+        "\n"
+        "This code prints hi to the console."
+    )
+    gen = ScriptedGenerator([raw])
+    block = make_block(type="code", language="cpp")
+    result = run_block(gen, block, {})
+    assert result.status == "ok"
+    assert "This code prints" not in result.validated_output
+    assert "#include <iostream>" in result.validated_output
+
+
+def test_code_block_extracts_fenced_block_not_at_start():
+    """Regression: model emits some leading whitespace/prose before the
+    fence and prose after the closing fence; only the fenced content should
+    be kept."""
+    raw = "Sure!\n```python\nprint('hi')\n```\nThis prints hi."
+    gen = ScriptedGenerator([raw])
+    block = make_block(type="code")
+    result = run_block(gen, block, {})
+    assert result.status == "ok"
+    assert result.validated_output == "print('hi')"
+
+
 def test_structured_block_validates_json():
     gen = ScriptedGenerator(['{"a": 1, "b": 2}'])
     block = make_block(type="structured")

@@ -36,7 +36,12 @@ text:
     do_sample: true
 
 code:
-  model_id: Qwen/Qwen2.5-Coder-1.5B-Instruct
+  # 3B instead of 1.5B: noticeably better instruction-following (less prose
+  # leakage into code blocks, fewer malformed-fence responses) and higher
+  # code quality, at the cost of needing more VRAM (~6-7GB in float16) than
+  # the smaller model. Drop back to Qwen2.5-Coder-1.5B-Instruct if you're
+  # constrained to a small (~4GB) GPU.
+  model_id: Qwen/Qwen2.5-Coder-3B-Instruct
   device: cuda
   dtype: float16
   generation_kwargs:

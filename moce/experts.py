@@ -93,8 +93,34 @@ def _clean_text(text: str) -> str:
     return _BOILERPLATE_PREFIXES.sub("", text.strip(), count=1).strip()
 
 
+def _extract_code(text: str) -> str:
+    """Extract just the code from `text`, discarding any prose the model
+    appended despite being told not to. This is fence-based extraction (not
+    NLP-based prose stripping): small models frequently still emit a
+    trailing explanation paragraph after the code, sometimes behind a
+    matched ```/``` pair, sometimes behind a single trailing/stray ``` with
+    no matching opener. Handles, in order:
+      1. A proper ```lang\ncode\n``` fenced block anywhere in the text ->
+         keep only the fenced content.
+      2. A single unpaired ``` marker (e.g. code, then a lone closing
+         fence, then prose) -> keep only the text before that marker.
+      3. No fences at all -> return the text unchanged (nothing safe to
+         trim without language-aware parsing).
+    """
+    text = text.strip()
+
+    paired = re.search(r"```(?:\w+)?\n?(.*?)```", text, re.DOTALL)
+    if paired:
+        return paired.group(1).strip()
+
+    if "```" in text:
+        return text.split("```", 1)[0].strip()
+
+    return text
+
+
 def _validate_code(text: str) -> str:
-    code = _strip_code_fences(text)
+    code = _extract_code(text)
     try:
         ast.parse(code)
     except SyntaxError:
