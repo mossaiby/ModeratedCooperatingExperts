@@ -51,10 +51,25 @@ def main(ctx: click.Context, verbose: bool) -> None:
     show_default=True,
     help="Max concurrent expert threads per dependency generation.",
 )
+@click.option(
+    "--verbose",
+    "verbose_flag",
+    is_flag=True,
+    help="Also print the moderator's plan and each block's output.",
+)
 @click.pass_context
-def run(ctx: click.Context, user_prompt: str, config_path: Path, dry_run: bool, max_workers: int) -> None:
+def run(
+    ctx: click.Context,
+    user_prompt: str,
+    config_path: Path,
+    dry_run: bool,
+    max_workers: int,
+    verbose_flag: bool,
+) -> None:
     """Run the full moderator -> experts -> assembler pipeline for USER_PROMPT."""
-    verbose = ctx.obj.get("verbose", False)
+    verbose = ctx.obj.get("verbose", False) or verbose_flag
+    if verbose:
+        logging.getLogger().setLevel(logging.INFO)
     manager = ModelManager.from_yaml(config_path)
 
     try:
