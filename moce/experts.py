@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_RETRIES = 3
 
 _BOILERPLATE_PREFIXES = re.compile(
-    r"^(sure|okay|ok|certainly|here('|’)s|here is|of course)[,:!.\s-]*",
+    r"^(?:(?:sure|okay|ok|certainly|here('|’)s|here is|of course|the answer is|the answer)"
+    r"[,:!.\s-]*)+",
     re.IGNORECASE,
 )
 
