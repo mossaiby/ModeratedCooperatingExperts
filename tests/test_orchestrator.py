@@ -84,5 +84,25 @@ def test_assemble_falls_back_to_block_id_reference():
     )
     results = {"json1": BlockResult(block_id="json1", validated_output='{"a": 1}', status="ok")}
     doc = assemble(plan, results)
-    assert doc == 'Result: {"a": 1}'
+    assert doc == 'Result: ```json\n{"a": 1}\n```'
+
+
+def test_assemble_wraps_code_block_in_fenced_markdown_with_language():
+    plan = Plan(
+        blocks=[
+            Block(
+                id="code1",
+                type="code",
+                prompt="p",
+                output_slot="code_slot",
+                language="python",
+            )
+        ],
+        assembly_template="{{code_slot}}",
+    )
+    results = {
+        "code1": BlockResult(block_id="code1", validated_output="print('hi')", status="ok")
+    }
+    doc = assemble(plan, results)
+    assert doc == "```python\nprint('hi')\n```"
 

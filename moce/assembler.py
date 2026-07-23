@@ -7,17 +7,29 @@ import re
 from moce.schema import BlockResult, Plan
 
 
+def _fence(content: str, language: str = "") -> str:
+    """Wrap `content` in a Markdown fenced code block tagged with `language`."""
+    return f"```{language}\n{content}\n```"
+
+
 def assemble(plan: Plan, results: dict[str, BlockResult]) -> str:
     """Fill `plan.assembly_template`'s `{{output_slot}}` placeholders with the
     corresponding block's validated output (or an error marker if the block
-    failed)."""
+    failed), producing a Markdown document. "code" blocks are wrapped in a
+    fenced code block tagged with their language; "structured" blocks are
+    wrapped in a ```json fence."""
     content_by_key: dict[str, str] = {}
     for block in plan.blocks:
         result = results.get(block.id)
         if result is None:
             content = f"[ERROR: block '{block.id}' was never executed]"
         elif result.status == "ok":
-            content = result.validated_output
+            if block.type == "code":
+                content = _fence(result.validated_output, block.language or "")
+            elif block.type == "structured":
+                content = _fence(result.validated_output, "json")
+            else:
+                content = result.validated_output
         else:
             content = f"[ERROR: block '{block.id}' failed validation: {result.error_message}]"
 

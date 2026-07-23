@@ -25,10 +25,11 @@ PLAN_JSON_SCHEMA_HINT = """
       "depends_on": ["list of block ids this block depends on, may be empty"],
       "prompt": "the exact instructions for the expert that will fill this block; may reference other blocks' output via {{block_id.output}}",
       "output_slot": "string name of the placeholder in assembly_template this block fills",
-      "constraints": "optional extra constraints string, or null"
+      "constraints": "optional extra constraints string, or null",
+      "language": "for \"code\" blocks only: the programming language name (e.g. python, javascript), used to tag the markdown code fence; null/omitted for other block types"
     }
   ],
-  "assembly_template": "string containing {{output_slot}} placeholders for every block's output_slot, defining the final document layout"
+  "assembly_template": "string containing {{output_slot}} placeholders for every block's output_slot, defining the final document layout. The final assembled document is Markdown."
 }
 """.strip()
 
@@ -49,7 +50,8 @@ Example — request: "Write a function to reverse a string and explain it."
       "depends_on": [],
       "prompt": "Write a complete, working function that reverses a string.",
       "output_slot": "code_block",
-      "constraints": null
+      "constraints": null,
+      "language": "python"
     },
     {
       "id": "text1",
@@ -76,6 +78,9 @@ class Block(BaseModel):
     prompt: str = Field(min_length=1)
     output_slot: str = Field(min_length=1)
     constraints: Optional[str] = None
+    language: Optional[str] = None
+    """Programming language name for "code" blocks (used to tag the markdown
+    code fence in the assembled document); ignored for other block types."""
 
     @field_validator("depends_on")
     @classmethod
