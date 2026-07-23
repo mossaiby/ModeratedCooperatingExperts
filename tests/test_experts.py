@@ -133,3 +133,19 @@ def test_dependency_substitution():
     run_block(gen, block, context)
     _, _, user_prompt = gen.calls[0]
     assert "print(1)" in user_prompt
+
+
+def test_dependency_output_injected_when_placeholder_missing():
+    """Regression: the moderator sometimes declares depends_on=["code1"] but
+    forgets to include the {{code1.output}} placeholder in the prompt text
+    itself (e.g. just "Explain what this code does"), which previously left
+    the expert with no actual code to describe."""
+    gen = ScriptedGenerator(["derived output"])
+    context = {
+        "code1": BlockResult(block_id="code1", validated_output="print(1)", status="ok")
+    }
+    block = make_block(id="b2", depends_on=["code1"], prompt="Explain what this code does.")
+    run_block(gen, block, context)
+    _, _, user_prompt = gen.calls[0]
+    assert "print(1)" in user_prompt
+

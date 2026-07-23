@@ -83,6 +83,32 @@ def _substitute_dependencies(prompt: str, context: dict[str, BlockResult]) -> st
     return re.sub(r"\{\{(\w[\w-]*)\.output\}\}", replace, prompt)
 
 
+def _append_missing_dependency_outputs(
+    prompt: str, original_prompt: str, block: Block, context: dict[str, BlockResult]
+) -> str:
+    """Defensive safety net: the moderator sometimes lists a block in
+    `depends_on` but forgets to actually reference its content via the
+    `{{block_id.output}}` placeholder in the prompt text (e.g. a "text"
+    block asks to "explain this code" without the code ever being attached).
+    Without this, the expert would receive a prompt with nothing to act on
+    and produce a response like "I'm sorry, but you haven't provided any "
+    "code for me to describe." As a fallback, any dependency declared in
+    `depends_on` whose placeholder is missing from the *original* (pre-
+    substitution) prompt has its output appended explicitly, so the
+    dependency's content always reaches the expert one way or another.
+    """
+    missing = [
+        (dep_id, context[dep_id].validated_output)
+        for dep_id in block.depends_on
+        if dep_id in context and f"{{{{{dep_id}.output}}}}" not in original_prompt
+    ]
+    if not missing:
+        return prompt
+
+    appended = "\n\n".join(f"[{dep_id}]:\n{output}" for dep_id, output in missing)
+    return f"{prompt}\n\n{appended}"
+
+
 def _strip_code_fences(text: str) -> str:
     text = text.strip()
     if text.startswith("```"):
@@ -160,6 +186,7 @@ def _run_image_block(generator: Generator, block: Block, context: dict[str, Bloc
     returning a Markdown image reference to the saved file as the block's
     validated output."""
     prompt = _substitute_dependencies(block.prompt, context)
+    prompt = _append_missing_dependency_outputs(prompt, block.prompt, block, context)
     if block.constraints:
         prompt = f"{prompt}\nAdditional constraints: {block.constraints}"
 
@@ -200,6 +227,7 @@ def run_block(
         system_prompt = f"{system_prompt}\nAdditional constraints: {block.constraints}"
 
     user_prompt = _substitute_dependencies(block.prompt, context)
+    user_prompt = _append_missing_dependency_outputs(user_prompt, block.prompt, block, context)
     last_error: str | None = None
 
     for attempt in range(1, max_retries + 1):

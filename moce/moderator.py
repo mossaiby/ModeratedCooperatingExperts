@@ -23,6 +23,14 @@ structured, or image), a prompt for the specialist expert who will fill it, \
 and may depend on other blocks (e.g. a text block explaining code may depend \
 on the code block).
 
+Whenever a block's "depends_on" list names another block, that block's \
+"prompt" text MUST actually include the literal placeholder \
+"{{{{block_id.output}}}}" for every id in "depends_on" — never just \
+describe the dependency in words (e.g. never write "explain this code" \
+without also including "{{{{code1.output}}}}" so the actual code is \
+attached). Omitting the placeholder means the expert receives no content \
+to act on and will respond that nothing was provided.
+
 If the request asks for code, create a separate "code" block whose prompt \
 asks the expert to write the actual, complete, working code (not a "text" \
 block describing code). A "code" block's output must be PURE CODE ONLY — \
