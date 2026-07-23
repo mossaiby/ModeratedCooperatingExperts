@@ -65,6 +65,36 @@ class ModeratorError(RuntimeError):
     retries are exhausted."""
 
 
+# Common near-miss block type names smaller models emit instead of the exact
+# literals in Block.type. Normalized before schema validation so a single
+# naming slip doesn't burn a whole retry cycle.
+_TYPE_SYNONYMS: dict[str, str] = {
+    "json": "structured",
+    "data": "structured",
+    "table": "structured",
+    "summary": "structured",
+    "prose": "text",
+    "explanation": "text",
+    "picture": "image",
+    "diagram": "image",
+    "svg": "image",
+}
+
+
+def _normalize_block_types(data: dict) -> dict:
+    blocks = data.get("blocks")
+    if not isinstance(blocks, list):
+        return data
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        block_type = block.get("type")
+        if isinstance(block_type, str):
+            normalized = block_type.strip().lower()
+            block["type"] = _TYPE_SYNONYMS.get(normalized, normalized)
+    return data
+
+
 def generate_plan(
     generator: Generator,
     user_request: str,
@@ -85,6 +115,7 @@ def generate_plan(
 
         try:
             data = json.loads(cleaned)
+            data = _normalize_block_types(data)
             plan = Plan.model_validate(data)
             validate_dag(plan)
             return plan
