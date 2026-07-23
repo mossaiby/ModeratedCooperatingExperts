@@ -95,6 +95,42 @@ def _normalize_block_types(data: dict) -> dict:
     return data
 
 
+def _normalize_depends_on(data: dict) -> dict:
+    """Some models reference a block's output_slot (or its own id/output_slot
+    mixed up) inside another block's `depends_on` instead of the referenced
+    block's id. Rewrite any depends_on entry that matches a known
+    output_slot to the corresponding block id, so a single mix-up doesn't
+    fail DAG validation and burn a whole retry cycle."""
+    blocks = data.get("blocks")
+    if not isinstance(blocks, list):
+        return data
+
+    slot_to_id: dict[str, str] = {}
+    known_ids: set[str] = set()
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        block_id = block.get("id")
+        output_slot = block.get("output_slot")
+        if isinstance(block_id, str):
+            known_ids.add(block_id)
+        if isinstance(output_slot, str) and isinstance(block_id, str):
+            slot_to_id[output_slot] = block_id
+
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        depends_on = block.get("depends_on")
+        if not isinstance(depends_on, list):
+            continue
+        block["depends_on"] = [
+            slot_to_id[dep] if dep not in known_ids and dep in slot_to_id else dep
+            for dep in depends_on
+            if isinstance(dep, str)
+        ]
+    return data
+
+
 def generate_plan(
     generator: Generator,
     user_request: str,
@@ -116,6 +152,7 @@ def generate_plan(
         try:
             data = json.loads(cleaned)
             data = _normalize_block_types(data)
+            data = _normalize_depends_on(data)
             plan = Plan.model_validate(data)
             validate_dag(plan)
             return plan

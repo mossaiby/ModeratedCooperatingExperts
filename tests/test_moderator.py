@@ -53,6 +53,23 @@ def test_generate_plan_normalizes_type_synonyms():
     assert plan.blocks[0].type == "structured"
 
 
+def test_generate_plan_normalizes_depends_on_output_slot_reference():
+    """Model referenced another block's output_slot name in depends_on
+    instead of that block's id."""
+    plan_json = """
+    {
+      "blocks": [
+        {"id": "code1", "type": "code", "depends_on": [], "prompt": "write code", "output_slot": "reverse_string_function"},
+        {"id": "text1", "type": "text", "depends_on": ["reverse_string_function"], "prompt": "explain {{code1.output}}", "output_slot": "explanation"}
+      ],
+      "assembly_template": "{{reverse_string_function}} {{explanation}}"
+    }
+    """
+    gen = ScriptedGenerator([plan_json])
+    plan = generate_plan(gen, "do something")
+    assert plan.blocks[1].depends_on == ["code1"]
+
+
 def test_generate_plan_raises_after_max_retries():
     gen = ScriptedGenerator(["nope", "still nope"])
     with pytest.raises(ModeratorError):
