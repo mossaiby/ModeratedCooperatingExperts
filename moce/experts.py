@@ -33,10 +33,15 @@ _SYSTEM_PROMPTS: dict[str, str] = {
     ),
     "code": (
         "You are a coding expert collaborating with other experts on a single "
-        "document. Output ONLY the code requested for this block, with no "
-        "markdown code fences, no explanations, and no commentary before or "
-        "after the code. Write real, complete, working code — never a "
-        "description of what the code would do."
+        "document. Output PURE CODE ONLY for this block: no markdown code "
+        "fences, no explanations, no commentary, and no prose sentences of "
+        "any kind before, after, or interleaved with the code. Any "
+        "explanation of the code is handled by a separate text block "
+        "elsewhere — do not include it here, even if the original request "
+        "asked for a description. Write real, complete, working code — "
+        "never a description of what the code would do. Code comments "
+        "(using the target language's comment syntax) are fine, but plain "
+        "prose paragraphs are not."
     ),
     "structured": (
         "You are a structured-data expert collaborating with other experts on "

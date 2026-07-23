@@ -25,11 +25,17 @@ on the code block).
 
 If the request asks for code, create a separate "code" block whose prompt \
 asks the expert to write the actual, complete, working code (not a "text" \
-block describing code). If the request asks for an explanation of that \
-code, create a separate "text" block that depends on the code block and \
-explains the *actual* code via {{{{block_id.output}}}}, rather than \
-describing hypothetically what code "could" do. Never substitute a "text" \
-block for what should be a "code" or "structured" block.
+block describing code). A "code" block's output must be PURE CODE ONLY — \
+never ask a code block to also include an explanation, description, or \
+commentary about the code; that always belongs in its own "text" block. \
+If the request asks for an explanation/description of that code, create a \
+separate "text" block that depends on the code block and explains the \
+*actual* code via {{{{block_id.output}}}}, rather than describing \
+hypothetically what code "could" do. Never substitute a "text" block for \
+what should be a "code" or "structured" block. If the request asks for \
+multiple pieces of code (e.g. several languages, several functions) each \
+with its own description, create one "code" block and one dependent "text" \
+block PER item, not a single combined block for all of them.
 
 Respond with ONLY a single JSON object matching this schema, with no \
 markdown fences, no commentary, and no extra text before or after the JSON:
