@@ -50,6 +50,16 @@ def configure_model_logging(verbose: bool, debug: bool = False, show_model_noise
     logic (raw model outputs, retries, etc.), not model loading internals.
     Pass show_model_noise=True to also surface that third-party noise.
 
+    --debug intentionally does NOT amplify third-party noise beyond INFO:
+    even with show_model_noise=True, noisy loggers are capped at INFO,
+    never DEBUG. Combining --debug with --show-model-noise previously
+    escalated every third-party logger (transformers/huggingface_hub/
+    diffusers/etc.) to DEBUG level, which produced an overwhelming amount
+    of unrelated library-internal trace output and made --debug's own
+    (project-level) diagnostics unreadable. If finer third-party trace is
+    ever needed, that should be a dedicated, explicit opt-in — not an
+    automatic side effect of --debug.
+
     Logger .setLevel() alone isn't always sufficient (some libraries reset
     their own logger's level on import, or print progress bars via tqdm
     rather than logging), so this also: disables each logger outright via
@@ -59,7 +69,7 @@ def configure_model_logging(verbose: bool, debug: bool = False, show_model_noise
     if show_model_noise:
         os.environ.pop("TRANSFORMERS_VERBOSITY", None)
         os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
-        level = logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING)
+        level = logging.INFO if verbose else logging.WARNING
         for name in _NOISY_LOGGERS:
             noisy_logger = logging.getLogger(name)
             noisy_logger.disabled = False
@@ -81,7 +91,7 @@ def configure_model_logging(verbose: bool, debug: bool = False, show_model_noise
         import transformers
 
         if show_model_noise:
-            transformers.logging.set_verbosity_debug() if debug else transformers.logging.set_verbosity_info()
+            transformers.logging.set_verbosity_info()
             transformers.logging.enable_progress_bar()
         else:
             transformers.logging.set_verbosity_error()
@@ -103,7 +113,7 @@ def configure_model_logging(verbose: bool, debug: bool = False, show_model_noise
         import diffusers
 
         if show_model_noise:
-            diffusers.logging.set_verbosity_debug() if debug else diffusers.logging.set_verbosity_info()
+            diffusers.logging.set_verbosity_info()
             diffusers.utils.logging.enable_progress_bar()
         else:
             diffusers.logging.set_verbosity_error()
