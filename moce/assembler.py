@@ -11,21 +11,26 @@ def assemble(plan: Plan, results: dict[str, BlockResult]) -> str:
     """Fill `plan.assembly_template`'s `{{output_slot}}` placeholders with the
     corresponding block's validated output (or an error marker if the block
     failed)."""
-    slot_to_content: dict[str, str] = {}
+    content_by_key: dict[str, str] = {}
     for block in plan.blocks:
         result = results.get(block.id)
         if result is None:
-            slot_to_content[block.output_slot] = f"[ERROR: block '{block.id}' was never executed]"
+            content = f"[ERROR: block '{block.id}' was never executed]"
         elif result.status == "ok":
-            slot_to_content[block.output_slot] = result.validated_output
+            content = result.validated_output
         else:
-            slot_to_content[block.output_slot] = (
-                f"[ERROR: block '{block.id}' failed validation: {result.error_message}]"
-            )
+            content = f"[ERROR: block '{block.id}' failed validation: {result.error_message}]"
+
+        content_by_key[block.output_slot] = content
+        # Also index by block id: moderator models sometimes reference a
+        # block's own id in assembly_template (dependency syntax) instead of
+        # its declared output_slot. output_slot is the authoritative key if
+        # the two happen to collide.
+        content_by_key.setdefault(block.id, content)
 
     def replace(match: re.Match) -> str:
-        slot = match.group(1)
-        return slot_to_content.get(slot, match.group(0))
+        key = match.group(1)
+        return content_by_key.get(key, match.group(0))
 
     # Tolerate a moderator model mistakenly appending a dotted suffix (e.g.
     # "{{slot.output}}" or "{{slot.output_slot}}"), confusing this template's

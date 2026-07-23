@@ -71,3 +71,18 @@ def test_assemble_tolerates_dotted_slot_suffix():
     doc = assemble(plan, results)
     assert doc == "A:hello B:hello"
 
+
+def test_assemble_falls_back_to_block_id_reference():
+    """Some moderator models reference a block's own id in assembly_template
+    (dependency syntax) instead of its declared output_slot, e.g.
+    "{{json1.output}}" where the block id is "json1" but output_slot is
+    something else entirely. The assembler should still resolve this via the
+    block id."""
+    plan = Plan(
+        blocks=[Block(id="json1", type="structured", prompt="p", output_slot="summary_slot")],
+        assembly_template="Result: {{json1.output}}",
+    )
+    results = {"json1": BlockResult(block_id="json1", validated_output='{"a": 1}', status="ok")}
+    doc = assemble(plan, results)
+    assert doc == 'Result: {"a": 1}'
+
