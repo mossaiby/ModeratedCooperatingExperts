@@ -27,42 +27,89 @@ DEFAULT_MAX_LOADED_MODELS = 2
 # Third-party loggers/env vars that are extremely chatty during model
 # download/load (HF Hub repo card fetches, tokenizer/config info logs,
 # progress bars, tokenizer-parallelism fork warnings) but rarely useful
-# unless actively debugging model loading itself.
-_NOISY_LOGGERS = ("transformers", "huggingface_hub", "urllib3", "filelock")
+# unless actively debugging model loading itself. Includes diffusers/
+# accelerate/safetensors since the "image" role uses a diffusers pipeline.
+_NOISY_LOGGERS = (
+    "transformers",
+    "huggingface_hub",
+    "diffusers",
+    "accelerate",
+    "safetensors",
+    "urllib3",
+    "filelock",
+)
 
 
 def configure_model_logging(verbose: bool, debug: bool = False, show_model_noise: bool = False) -> None:
-    """Silence (or re-enable) noisy transformers/huggingface_hub logging and
-    progress bars. Call this once, before any model is loaded, based on the
-    CLI's --verbose/--debug/--show-model-noise flags.
+    """Silence (or re-enable) noisy transformers/huggingface_hub/diffusers
+    logging and progress bars. Call this once, before any model is loaded,
+    based on the CLI's --verbose/--debug/--show-model-noise flags.
 
-    Third-party model-loading noise (transformers/huggingface_hub/urllib3/
-    filelock logs, HF Hub progress bars) is suppressed by default even when
+    Third-party model-loading noise is suppressed by default even when
     --debug is set, since --debug is meant for diagnosing *this project's*
     logic (raw model outputs, retries, etc.), not model loading internals.
-    Pass show_model_noise=True to also surface that third-party noise."""
+    Pass show_model_noise=True to also surface that third-party noise.
+
+    Logger .setLevel() alone isn't always sufficient (some libraries reset
+    their own logger's level on import, or print progress bars via tqdm
+    rather than logging), so this also: disables each logger outright via
+    `.disabled = True`, and explicitly calls each library's own
+    progress-bar toggle where available.
+    """
     if show_model_noise:
         os.environ.pop("TRANSFORMERS_VERBOSITY", None)
         os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
         level = logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING)
         for name in _NOISY_LOGGERS:
-            logging.getLogger(name).setLevel(level)
+            noisy_logger = logging.getLogger(name)
+            noisy_logger.disabled = False
+            noisy_logger.setLevel(level)
     else:
         os.environ["TRANSFORMERS_VERBOSITY"] = "error"
         os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
         os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
         for name in _NOISY_LOGGERS:
-            logging.getLogger(name).setLevel(logging.ERROR)
+            noisy_logger = logging.getLogger(name)
+            noisy_logger.setLevel(logging.ERROR)
+            # Some of these libraries reconfigure their own logger's level
+            # (or attach their own handler) on import, overriding a plain
+            # setLevel() call made beforehand; disabling outright is a
+            # stronger guarantee that it stays silent.
+            noisy_logger.disabled = True
 
     try:
         import transformers
 
         if show_model_noise:
             transformers.logging.set_verbosity_debug() if debug else transformers.logging.set_verbosity_info()
+            transformers.logging.enable_progress_bar()
         else:
             transformers.logging.set_verbosity_error()
+            transformers.logging.disable_progress_bar()
     except ImportError:
         pass  # transformers not installed yet / not needed for this call site
+
+    try:
+        import huggingface_hub
+
+        if show_model_noise:
+            huggingface_hub.utils.enable_progress_bars()
+        else:
+            huggingface_hub.utils.disable_progress_bars()
+    except ImportError:
+        pass
+
+    try:
+        import diffusers
+
+        if show_model_noise:
+            diffusers.logging.set_verbosity_debug() if debug else diffusers.logging.set_verbosity_info()
+            diffusers.utils.logging.enable_progress_bar()
+        else:
+            diffusers.logging.set_verbosity_error()
+            diffusers.utils.logging.disable_progress_bar()
+    except ImportError:
+        pass
 
 
 @dataclass
