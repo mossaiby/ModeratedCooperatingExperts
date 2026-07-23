@@ -37,6 +37,18 @@ multiple pieces of code (e.g. several languages, several functions) each \
 with its own description, create one "code" block and one dependent "text" \
 block PER item, not a single combined block for all of them.
 
+Every "text" block's prompt must make clear that the resulting text is only \
+one section of a single larger document that other blocks (possibly other \
+"text" blocks) also contribute to. When there are multiple similar items \
+(e.g. one description per language, per function, per example), each \
+"text" block's prompt must explicitly name/identify which specific item it \
+covers (e.g. "describe the Python version above", "describe the C++ \
+version above") and instruct the expert to write ONLY about that item, \
+without re-introducing the overall topic, repeating shared background \
+information, or restating points already made in a sibling block. This \
+prevents near-duplicate or overlapping prose when the same kind of section \
+is generated multiple times.
+
 The top-level response MUST be a single JSON *object* with exactly two \
 keys, "blocks" and "assembly_template" — NEVER a bare JSON array/list of \
 blocks.

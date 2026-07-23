@@ -34,6 +34,12 @@ _SYSTEM_PROMPTS: dict[str, str] = {
         "single document. Output ONLY the prose text requested for this block. "
         "Do not include headings, preambles, disclaimers, or any commentary "
         "about what you are doing. Do not repeat content from other blocks. "
+        "This text is only ONE section of a larger document that other "
+        "blocks also contribute to — if this section covers one of several "
+        "similar items (e.g. one of multiple languages/examples/functions), "
+        "write ONLY about the specific item named in the prompt below; do "
+        "not re-introduce the overall topic, restate shared background, or "
+        "repeat points that belong to sibling sections about other items. "
         "Directly produce the requested content itself — do not describe what "
         "could or would be written/created/shown; do not talk about the task "
         "in the abstract or hypothetically."
@@ -119,15 +125,27 @@ def _extract_code(text: str) -> str:
     return text
 
 
-def _validate_code(text: str) -> str:
+# Aliases the `language` field may use for Python; only these are eligible
+# for the ast.parse() syntax check below, since it can only ever recognize
+# Python and would produce a misleading "invalid" message for any other
+# target language.
+_PYTHON_LANGUAGE_NAMES = {"python", "py", "python3"}
+
+
+def _validate_code(text: str, language: str | None = None) -> str:
     code = _extract_code(text)
-    try:
-        ast.parse(code)
-    except SyntaxError:
-        # Not necessarily Python / not necessarily invalid for the target
-        # language; only Python is syntax-checked in v1, so log and pass
-        # through rather than failing the block.
-        logger.debug("code block is not valid Python (may be another language)")
+
+    # Only syntax-check when the block is (or may be) Python: `language` is
+    # unset for legacy/unlabeled blocks (assume Python, the historical
+    # default), or explicitly "python". Any other explicit language is
+    # skipped entirely rather than logged, since ast.parse() can only ever
+    # validate Python and would otherwise misleadingly claim non-Python code
+    # (e.g. C++, JS) "is not valid Python" on every single run.
+    if language is None or language.strip().lower() in _PYTHON_LANGUAGE_NAMES:
+        try:
+            ast.parse(code)
+        except SyntaxError:
+            logger.debug("code block (language=%s) is not valid Python", language)
     return code
 
 
@@ -195,7 +213,7 @@ def run_block(
         )
         try:
             if block.type == "code":
-                validated = _validate_code(raw)
+                validated = _validate_code(raw, block.language)
             elif block.type == "structured":
                 validated = _validate_structured(raw)
             else:  # text
