@@ -7,16 +7,20 @@
 # `max_loaded_models` below, since a single GPU may not hold every model at once.
 # Tuned here for a 4GB-VRAM GPU (e.g. RTX 3050): small models, float16, and
 # max_loaded_models=2 so at most two ~0.5-1.5B models are resident at once.
+# The moderator uses a slightly larger 1.5B model since plan decomposition
+# (correct block types, ids, dependencies) is the hardest task in the
+# pipeline and most prone to errors with a 0.5B model. If you have more
+# VRAM available, consider bumping other roles too.
 
 max_loaded_models: 2
 
 moderator:
-  model_id: Qwen/Qwen2.5-0.5B-Instruct
+  model_id: Qwen/Qwen2.5-1.5B-Instruct
   device: cuda
   dtype: float16
   generation_kwargs:
     max_new_tokens: 512
-    temperature: 0.3
+    temperature: 0.2
     do_sample: true
 
 text:
