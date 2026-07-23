@@ -1,0 +1,32 @@
+[project]
+name = "moce"
+version = "0.1.0"
+description = "Moderated Cooperating Experts - multi-LLM block-based orchestration"
+requires-python = ">=3.10"
+dependencies = [
+    "transformers>=4.40",
+    # NOTE: PyPI only distributes CPU-only torch wheels. The GPU (CUDA) build
+    # must be installed separately from the PyTorch CUDA index, e.g.:
+    #   pip install "torch==2.6.0+cu124" --index-url https://download.pytorch.org/whl/cu124
+    # See README.md for the exact command matching your GPU/driver.
+    "torch>=2.2",
+    "pydantic>=2.6",
+    "click>=8.1",
+    "pyyaml>=6.0",
+    "networkx>=3.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+moce = "moce.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["moce*"]

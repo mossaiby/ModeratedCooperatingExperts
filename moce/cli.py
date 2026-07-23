@@ -1,0 +1,86 @@
+"""CLI entrypoint for MoCE."""
+from __future__ import annotations
+
+import json
+import logging
+import sys
+from pathlib import Path
+
+import click
+
+from moce.assembler import assemble
+from moce.model_manager import ModelManager
+from moce.moderator import ModeratorError, generate_plan
+from moce.orchestrator import run_plan
+
+DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "models.yaml"
+
+
+@click.group()
+@click.option("--verbose", is_flag=True, help="Enable verbose logging and intermediate output.")
+@click.pass_context
+def main(ctx: click.Context, verbose: bool) -> None:
+    """Moderated Cooperating Experts CLI."""
+    ctx.ensure_object(dict)
+    ctx.obj["verbose"] = verbose
+    logging.basicConfig(
+        level=logging.INFO if verbose else logging.WARNING,
+        format="%(levelname)s %(name)s: %(message)s",
+    )
+
+
+@main.command()
+@click.argument("user_prompt")
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=DEFAULT_CONFIG_PATH,
+    show_default=True,
+    help="Path to the model configuration YAML file.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Only generate and print the moderator's plan; skip expert execution.",
+)
+@click.option(
+    "--max-workers",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Max concurrent expert threads per dependency generation.",
+)
+@click.pass_context
+def run(ctx: click.Context, user_prompt: str, config_path: Path, dry_run: bool, max_workers: int) -> None:
+    """Run the full moderator -> experts -> assembler pipeline for USER_PROMPT."""
+    verbose = ctx.obj.get("verbose", False)
+    manager = ModelManager.from_yaml(config_path)
+
+    try:
+        plan = generate_plan(manager, user_prompt)
+    except ModeratorError as exc:
+        click.echo(f"Moderator failed: {exc}", err=True)
+        sys.exit(1)
+
+    if verbose or dry_run:
+        click.echo("=== Plan ===")
+        click.echo(json.dumps(plan.model_dump(), indent=2))
+
+    if dry_run:
+        return
+
+    results = run_plan(manager, plan, max_workers=max_workers)
+
+    if verbose:
+        click.echo("\n=== Block Results ===")
+        for block_id, result in results.items():
+            click.echo(f"--- {block_id} ({result.status}) ---")
+            click.echo(result.validated_output or result.error_message or "")
+
+    click.echo("\n=== Final Document ===")
+    click.echo(assemble(plan, results))
+
+
+if __name__ == "__main__":
+    main()

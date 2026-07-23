@@ -1,0 +1,47 @@
+# MoCE model configuration.
+# Maps each "role" (the moderator, plus one per block type) to a HuggingFace
+# model id/path and generation settings. Swap `model_id` for any local or
+# hub model compatible with AutoModelForCausalLM + a chat template.
+#
+# Note: models are loaded lazily and cached with an LRU policy bounded by
+# `max_loaded_models` below, since a single GPU may not hold every model at once.
+# Tuned here for a 4GB-VRAM GPU (e.g. RTX 3050): small models, float16, and
+# max_loaded_models=2 so at most two ~0.5-1.5B models are resident at once.
+
+max_loaded_models: 2
+
+moderator:
+  model_id: Qwen/Qwen2.5-0.5B-Instruct
+  device: cuda
+  dtype: float16
+  generation_kwargs:
+    max_new_tokens: 512
+    temperature: 0.3
+    do_sample: true
+
+text:
+  model_id: Qwen/Qwen2.5-0.5B-Instruct
+  device: cuda
+  dtype: float16
+  generation_kwargs:
+    max_new_tokens: 512
+    temperature: 0.7
+    do_sample: true
+
+code:
+  model_id: Qwen/Qwen2.5-Coder-1.5B-Instruct
+  device: cuda
+  dtype: float16
+  generation_kwargs:
+    max_new_tokens: 512
+    temperature: 0.2
+    do_sample: true
+
+structured:
+  model_id: Qwen/Qwen2.5-0.5B-Instruct
+  device: cuda
+  dtype: float16
+  generation_kwargs:
+    max_new_tokens: 256
+    temperature: 0.1
+    do_sample: true
